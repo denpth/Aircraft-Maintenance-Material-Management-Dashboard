@@ -1,0 +1,31 @@
+{
+  "dataset": "Fully synthetic AV3M dashboard demo",
+  "original_records_copied": 0,
+  "reporting_period": "January\u2013December 2024 (synthetic)",
+  "wings": 12,
+  "commands": 108,
+  "aircraft_commands": 96,
+  "scir_commands": 84,
+  "aircraft": 384,
+  "tecs": 8,
+  "wucs": 64,
+  "rows": {
+    "tblCannWUC": 13824,
+    "tblJobStatusAcft": 11520,
+    "tblJobStatusAll": 12960,
+    "tblMaint1": 4608,
+    "tblMaint2": 4608,
+    "tblMaint3": 13824,
+    "tblMaint5": 4608,
+    "tblSCIR": 1008
+  },
+  "integrity": "ok",
+  "source_database_unchanged": true,
+  "notes": [
+    "Only table/column definitions were read from the source database.",
+    "All records, identifiers, descriptions, metadata, dates, and measures were newly generated.",
+    "Missing SCIR/aircraft coverage is intentional to demonstrate no-data behavior.",
+    "No original-to-demo identifier map exists.",
+    "This is a demo dataset; it must not be used for operational reporting."
+  ]
+}

@@ -1,0 +1,7 @@
+*.db
+!database.synthetic.db
+*.db-*
+*.backup*
+*.csv
+.DS_Store
+__pycache__/
