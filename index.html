@@ -1492,21 +1492,100 @@ else if (typeof exports === 'object'){
         values.forEach((v, i) => { if (v === null) { gap = true; return; } path += (gap ? "M" : "L") + x(i) + "," + y(v); gap = false; });
         return `<svg class="sparkline" viewBox="0 0 108 32" role="img" aria-label="Monthly ${esc(metric.label)} trend"><path d="${path}" fill="none" stroke="${metricColor(metric)}" stroke-width="2"/>${values.map((v, i) => v === null ? "" : `<circle cx="${x(i)}" cy="${y(v)}" r="2" fill="${metricColor(metric)}" ${pointTooltipAttributes(metric.label, v, metric.unit, months[i], metricColor(metric))}></circle>`).join("")}</svg>`;
     }
+    // Calendar helpers for monthly forecasts and uncertainty horizons.
+    function forecastMonthNumber(month) {
+        const [year, number] = month.split("-").map(Number);
+        return year * 12 + number - 1;
+    }
+    function forecastMonthKey(number) {
+        return Math.floor(number / 12) + "-" + String(number % 12 + 1).padStart(2, "0");
+    }
+    function rollingThreeForecast(values, months, upperBound) {
+        const history = months.flatMap((month, i) => Number.isFinite(values[i]) ? [{ month, value: values[i] }] : []);
+        if (history.length < 3) return null;
+        const bound = value => Math.min(upperBound ?? Infinity, Math.max(0, value));
+        const anchor = history.at(-1);
+        const windowFor = (points, next) => {
+            const window = points.filter(point => {
+                const number = forecastMonthNumber(point.month);
+                return number >= next - 3 && number < next;
+            });
+            // Require the three preceding calendar months, not three arbitrarily old observations.
+            return window.length === 3 ? window : null;
+        };
+        const fitTrend = window => {
+            const median = values => {
+                const sorted = values.slice().sort((a, b) => a - b);
+                return (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2;
+            };
+            const origin = forecastMonthNumber(window[0].month), slopes = [];
+            for (let i = 0; i < window.length; i++) for (let j = i + 1; j < window.length; j++) {
+                slopes.push((window[j].value - window[i].value) / (forecastMonthNumber(window[j].month) - forecastMonthNumber(window[i].month)));
+            }
+            const slope = median(slopes);
+            const intercept = median(window.map(point => point.value - slope * (forecastMonthNumber(point.month) - origin)));
+            return { slope, intercept, origin, predict: month => intercept + slope * (month - origin) };
+        };
+        const initialWindow = windowFor(history, forecastMonthNumber(anchor.month) + 1);
+        if (!initialWindow) return null;
+        const end = forecastMonthNumber(months.at(-1)) + 4;
+        const steps = [], working = history.slice();
+        let accumulatedVariance = 0;
+        for (let next = forecastMonthNumber(anchor.month) + 1; next <= end; next++) {
+            const window = windowFor(working, next);
+            if (!window) return null;
+            const fit = fitTrend(window), level = fit.predict(next), value = bound(level);
+            const horizon = next - forecastMonthNumber(anchor.month);
+            // Measure spread from exactly the same three inputs as the trend.
+            const mean = window.reduce((sum, point) => sum + point.value, 0) / window.length;
+            const variance = window.reduce((sum, point) => sum + (point.value - mean) ** 2, 0) / (window.length - 1);
+            accumulatedVariance += variance;
+            // Retain uncertainty from earlier projected steps so smoother generated
+            // inputs cannot make later months appear more certain.
+            const margin = Math.sqrt(accumulatedVariance * (1 + horizon / 3));
+            const month = forecastMonthKey(next);
+            steps.push({ month, value, level, fit, variance, standardDeviation: Math.sqrt(variance), accumulatedVariance, margin, lower: bound(value - margin), upper: bound(value + margin), inputs: window.map(point => ({ ...point })) });
+            working.push({ month, value, projected: true });
+        }
+        const predictions = new Map(steps.map(step => [step.month, step.value]));
+        return { anchor, steps, predict: month => predictions.get(month) };
+    }
     function lineChart(series, months, unit, fixedMax, highlight = null) {
         const values = series.flatMap(s => s.values).filter(v => v !== null && Number.isFinite(v));
         if (!values.length) return `<div class="chart-empty">No matching monthly observations.</div>`;
+        const models = series.map(s => rollingThreeForecast(s.values, months, unit === "%" && fixedMax === 100 ? 100 : undefined));
+        const hasForecast = models.some(Boolean);
+        const lastMonth = forecastMonthNumber(months.at(-1));
+        const futureMonths = hasForecast ? [1, 2, 3, 4].map(offset => forecastMonthKey(lastMonth + offset)) : [];
+        const chartMonths = months.concat(futureMonths);
+        const firstMonth = forecastMonthNumber(months[0]);
+        const monthPosition = month => forecastMonthNumber(month) - firstMonth;
+        const chartSpan = monthPosition(chartMonths.at(-1)) + 1;
+        const forecastValues = models.flatMap(model => model ? model.steps.flatMap(step => [step.value, step.upper]) : []);
         const w = 800, h = 310, left = 68, top = 20, right = 20, bottom = 55;
-        const max = fixedMax || Math.max(...values, 1) * 1.1;
-        const x = i => left + (i + .5) / Math.max(months.length, 1) * (w - left - right);
+        const max = fixedMax || Math.max(...values, ...forecastValues, 1) * 1.1;
+        const x = i => left + (monthPosition(chartMonths[i]) + .5) / chartSpan * (w - left - right);
         const y = v => h - bottom - v / max * (h - top - bottom);
         const grid = Array.from({ length: 5 }, (_, i) => { const v = i / 4 * max; return `<line x1="${left}" y1="${y(v)}" x2="${w - right}" y2="${y(v)}" class="chart-grid-line"/><text x="${left - 8}" y="${y(v) + 4}" text-anchor="end" class="chart-value-label">${esc(unit === "%" ? nf.format(v) + "%" : compact.format(v))}</text>`; }).join("");
         const lines = series.map((s, si) => {
             let path = "", gap = true;
             s.values.forEach((v, i) => { if (v === null) { gap = true; return; } path += (gap ? "M" : "L") + x(i) + "," + y(v); gap = false; });
-            return `<g opacity="${highlight && highlight !== "all" && s.label !== highlight ? .18 : 1}"${highlight !== null ? ` data-status="${esc(s.label)}"` : ""}><path d="${path}" stroke="${s.color || colors[si % colors.length]}" class="chart-status-line" style="stroke-width:${highlight === s.label ? 4 : 2}"/>${s.values.map((v, i) => v === null ? "" : `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${s.color || colors[si % colors.length]}" ${pointTooltipAttributes(s.label, v, unit, months[i], s.color || colors[si % colors.length])}></circle>`).join("")}</g>`;
+            const model = models[si], color = s.color || colors[si % colors.length];
+            const projectedPoints = model ? [model.anchor, ...model.steps] : [];
+            const projectedPath = projectedPoints.map((point, i) => (i ? "L" : "M") + (left + (monthPosition(point.month) + .5) / chartSpan * (w - left - right)) + "," + y(point.value)).join("");
+            const bandPoints = model ? [{ month: model.anchor.month, lower: model.anchor.value, upper: model.anchor.value }, ...model.steps] : [];
+            const bandEdge = (points, edge) => points.map((point, i) => (i ? "L" : "M") + (left + (monthPosition(point.month) + .5) / chartSpan * (w - left - right)) + "," + y(point[edge])).join("");
+            const upperEdge = bandEdge(bandPoints, "upper");
+            const lowerEdge = bandEdge(bandPoints, "lower");
+            const band = model ? `<path class="forecast-band" d="${upperEdge}${bandEdge(bandPoints.slice().reverse(), "lower").replace(/^M/, "L")}Z" fill="${color}" fill-opacity=".13" stroke="none" pointer-events="none"/><path d="${upperEdge}" fill="none" stroke="${color}" stroke-opacity=".55" stroke-dasharray="3 4" pointer-events="none"/><path d="${lowerEdge}" fill="none" stroke="${color}" stroke-opacity=".55" stroke-dasharray="3 4" pointer-events="none"/>` : "";
+            const projection = model ? `${band}<path d="${projectedPath}" stroke="${color}" class="chart-status-line" stroke-dasharray="8 5" style="stroke-width:2.5"/>${futureMonths.map((month, i) => `<circle cx="${x(months.length + i)}" cy="${y(model.predict(month))}" r="4" fill="white" ${pointTooltipAttributes(s.label + " (Projected trend; Illustrative range " + nf.format(model.steps.find(step => step.month === month).lower) + "–" + nf.format(model.steps.find(step => step.month === month).upper) + ")", model.predict(month), unit, month, color)} style="stroke:${color};stroke-width:2"></circle>`).join("")}` : "";
+            return `<g opacity="${highlight && highlight !== "all" && s.label !== highlight ? .18 : 1}"${highlight !== null ? ` data-status="${esc(s.label)}"` : ""}><path d="${path}" stroke="${s.color || colors[si % colors.length]}" class="chart-status-line" style="stroke-width:${highlight === s.label ? 4 : 2}"/>${projection}${s.values.map((v, i) => v === null ? "" : `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${s.color || colors[si % colors.length]}" ${pointTooltipAttributes(s.label, v, unit, months[i], s.color || colors[si % colors.length])}></circle>`).join("")}</g>`;
         }).join("");
         const stride = Math.ceil(months.length / 12);
-        return `<div class="chart-wrap"><svg class="line-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Monthly trends, ${esc(unit)}">${grid}${lines}${months.map((month, i) => i % stride && i !== months.length - 1 ? "" : `<text x="${x(i)}" y="${h - 25}" text-anchor="middle" class="chart-axis-label">${monthLabel(month).replace(" 20", " ’")}</text>`).join("")}</svg><div class="line-legend">${series.map((s, i) => `<${highlight !== null ? "button type=\"button\"" : "span"} class="legend-item${highlight === s.label ? " status-highlight" : ""}"${highlight !== null ? ` data-status="${esc(s.label)}" ${statusTooltip(s.label)} aria-pressed="${highlight === s.label}"` : ""} style="opacity:${highlight && highlight !== "all" && s.label !== highlight ? .4 : 1}"><i style="background:${s.color || colors[i % colors.length]}"></i>${s.description ? wucLabel(s.label, s.description) : esc(s.label)}</${highlight !== null ? "button" : "span"}>`).join("")}</div><p class="panel-subtitle">Hover over a dot to see its series, value and month. Use the header dropdowns to change the reporting period. Missing observations break the line.</p></div>`;
+        const boundary = x(months.length - 1) + (w - left - right) / chartSpan / 2;
+        const forecastRegion = hasForecast ? `<rect x="${boundary}" y="${top}" width="${w - right - boundary}" height="${h - top - bottom}" fill="#2684c7" opacity=".06"/><line x1="${boundary}" y1="${top}" x2="${boundary}" y2="${h - bottom}" stroke="#64748b" stroke-dasharray="3 4"/><text x="${(boundary + w - right) / 2}" y="${top - 5}" text-anchor="middle" class="chart-axis-label">Projected trend<tspan x="${(boundary + w - right) / 2}" dy="12" font-size="9" font-style="italic">*Rolling 3 month trend</tspan></text>` : "";
+        const modelDetails = `<details class="forecast-models"><summary>Projected trend method and formulas</summary><p class="panel-subtitle">A directional view of where recent behavior could lead if it continues, to support discussion and decisions about changes. Rolling three-month robust linear regression (Theil–Sen, degree 1). Each future month fits a trend to the immediately preceding three calendar months. The slope is the median of all 3 pairwise slopes; the intercept is the median of value − slope × t. Predict the next month, append the prediction, drop the oldest month, and fit again. Earlier projections are included in later windows. All three input months must be available; missing months in the initial window prevent a forecast. Dashed lines connect to the last actual observation. Estimates are bounded at zero${unit === "%" && fixedMax === 100 ? " and 100%" : ""}. The colored fan is the Illustrative range, not a calibrated confidence interval. It provides visual context for the trend rather than a measured probability of future outcomes. Each step uses the sample variance of the exact same three monthly inputs as its trend fit, including earlier projected values. Sample variance is Σ(value − window mean)² / 2. Variances accumulate across projected steps; the half-width is √(accumulated variance × (1 + h/3)), where h is calendar months since the last actual. This keeps earlier uncertainty as the window advances. No 12-month error history is used. Bounds may limit visible widening; constant input windows may have zero spread. Seasonality and operational changes are not modeled.</p>${series.map((s, i) => { const model = models[i]; return `<p class="panel-subtitle">${esc(s.label)}: ${model ? model.steps.map(step => `${esc(monthLabel(step.month))}: inputs ${esc(monthLabel(step.inputs[0].month))}–${esc(monthLabel(step.inputs.at(-1).month))}; ${step.inputs.filter(point => !point.projected).length} actual + ${step.inputs.filter(point => point.projected).length} projected. ŷ = ${step.fit.intercept.toPrecision(8)} ${step.fit.slope < 0 ? "−" : "+"} ${Math.abs(step.fit.slope).toPrecision(8)} × t, where t is calendar months since ${esc(monthLabel(forecastMonthKey(step.fit.origin)))}; window standard deviation ${nf.format(step.standardDeviation)} ${esc(unit)}; estimate ${nf.format(step.value)} ${esc(unit)}; Illustrative range ${nf.format(step.lower)}–${nf.format(step.upper)} ${esc(unit)}.`).join("<br>") : "Projected trend unavailable: all three preceding calendar months must have observations."}</p>`; }).join("")}</details>`;
+        return `<div class="chart-wrap"><svg class="line-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Monthly trends, ${esc(unit)}">${forecastRegion}${grid}${lines}${chartMonths.map((month, i) => i < months.length && i % stride && i !== months.length - 1 ? "" : `<text x="${x(i)}" y="${h - 25}" text-anchor="middle" class="chart-axis-label">${monthLabel(month).replace(" 20", " ’")}</text>`).join("")}</svg><div class="line-legend">${series.map((s, i) => `<${highlight !== null ? "button type=\"button\"" : "span"} class="legend-item${highlight === s.label ? " status-highlight" : ""}"${highlight !== null ? ` data-status="${esc(s.label)}" ${statusTooltip(s.label)} aria-pressed="${highlight === s.label}"` : ""} style="opacity:${highlight && highlight !== "all" && s.label !== highlight ? .4 : 1}"><i style="background:${s.color || colors[i % colors.length]}"></i>${s.description ? wucLabel(s.label, s.description) : esc(s.label)}</${highlight !== null ? "button" : "span"}>`).join("")}</div>${modelDetails}</div>`;
     }
     function distribution(rows) {
         const buckets = new Map();

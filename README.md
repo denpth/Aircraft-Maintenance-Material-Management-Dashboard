@@ -7,6 +7,12 @@ Interactive aircraft maintenance dashboard with a self-contained SQLite/WASM eng
 - [Synthetic demo database](database.synthetic.db)
 - [Repository file and purpose guide](FILE_GUIDE.md)
 
+## Projected trends
+
+Monthly charts extend four months ahead using a rolling three-month robust linear trend. Each projected month enters the next window. Dashed lines show the projected trend; shaded illustrative ranges use variance from the same three inputs and widen across future months. These are directional aids for considering changes, not validated predictions or confidence intervals.
+
+Run `node scripts/verify-projections.cjs` to check the rolling windows, formulas, illustrative ranges, and connected chart paths.
+
 ## Demo data
 
 All database records are synthetic. Identifiers, organizations, aircraft, WUC descriptions, dates, metadata, and numeric measures were generated independently. No operational records or original-to-demo mappings were copied. The dataset covers January–December 2024 with 12 Wings, 108 Commands, and 384 aircraft. Some Commands intentionally lack aircraft or SCIR data to demonstrate coverage messages.
