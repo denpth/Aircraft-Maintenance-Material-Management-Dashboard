@@ -482,6 +482,9 @@ input:focus-visible {
 
 .panel-header { flex-direction: column; }
 }
+.demo-back { display: inline-block; margin-bottom: 12px; color: #dce9f5; text-decoration: none; font-size: 13px; font-weight: 600; }
+.demo-back:hover { color: #fff; text-decoration: underline; }
+.demo-back:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 </style>
 <style>
 [hidden] { display: none !important; }
@@ -1154,6 +1157,7 @@ else if (typeof exports === 'object'){
     document.getElementById("app").innerHTML = `
         <div class="app-shell">
             <header class="site-header"><div class="header-inner">
+                <a id="demoBack" class="demo-back" href="https://dpothier.com/projects/aircraft-maintenance-dashboard/">← Back</a>
                 <div class="brand-row"><div class="brand"><div class="brand-mark" aria-hidden="true">M</div><div><p class="eyebrow">AV3M · O-Level</p><h1>AV3M Summary Dashboard</h1></div><p class="replication-advisory">* Fully synthetic demo data: all identifiers, dates and metrics are generated. <a href="./engine.html" style="color:inherit">SQLite Workbench</a></p></div>
                     <div id="databaseControls" class="header-status" hidden><strong id="sourceState">Loading database.db…</strong><div class="source-actions"><input id="databaseFile" type="file" accept=".db,.sqlite,.sqlite3" class="file-input"><label for="databaseFile" class="button-secondary">Choose Database</label><button id="reloadDataButton" class="button-secondary" type="button">Reload</button></div></div>
                 </div>
@@ -1183,6 +1187,22 @@ else if (typeof exports === 'object'){
                 <div id="dropZone" class="drop-zone" aria-hidden="true">Drop a SQLite database to open the dashboard</div>
             </main>
         </div>`;
+    // Public-demo navigation only; keep this out of the operational dashboard.
+    const demoBack = document.getElementById("demoBack");
+    let previousPage = null;
+    try {
+        const referrer = new URL(document.referrer);
+        if (/^https?:$/.test(referrer.protocol) && referrer.hostname !== "demodashboard.pothier.dev") previousPage = referrer;
+    } catch (_) { /* Direct visits use the project-page link. */ }
+    if (previousPage) {
+        demoBack.href = previousPage.href;
+        demoBack.addEventListener("click", event => {
+            if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0 && history.length > 1) {
+                event.preventDefault();
+                history.back();
+            }
+        });
+    }
     const el = Object.fromEntries(["excludeM9MFControl", "excludeM9MF", "jobStatusSource", "chartTooltip", "dashboardSlicers", "databaseControls", "sourceState", "snapshotTiles", "pageTitle", "dataState", "message", "wingFilter", "commandFilter", "startMonthFilter", "endMonthFilter", "metricFilter", "statusFilter", "databaseFile", "reloadDataButton", "dropZone"].map(id => [id, document.getElementById(id)]));
 
     function monthKey(value) {
