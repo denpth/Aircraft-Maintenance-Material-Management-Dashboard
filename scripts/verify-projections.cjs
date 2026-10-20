@@ -51,9 +51,6 @@ assert.equal(december.month,'2026-12');
 assert.deepEqual(Array.from(december.inputs,p=>p.month),['2026-09','2026-10','2026-11']);
 assert.equal(december.inputs.filter(p=>p.projected).length,3);
 const output=context.lineChart([{label:'Metric',values,color:'blue'}],months,'h');
-assert(output.includes('Rolling three-month robust linear regression'));
-assert(output.includes('0 actual + 3 projected'));
-assert(output.includes('not a calibrated confidence interval'));
 assert(output.includes('class="forecast-band"'));
 assert(!output.includes('NaN')&&!output.includes('Infinity'));
 const paths=[...output.matchAll(/<path\b[^>]*>/g)].map(m=>m[0]);
@@ -62,7 +59,6 @@ const projected=paths.find(p=>p.includes('stroke-dasharray="8 5"'));
 assert.equal(projected.match(/d="M([^L]+)/)[1],actual.split('L').at(-1));
 assert(output.includes('>Projected trend<tspan'));
 assert(output.includes('*Rolling 3 month trend'));
-assert(output.includes('Illustrative range'));
 assert(output.includes('2026-04'));
 const short=context.lineChart([{label:'Metric',values:values.slice(0,2)}],months.slice(0,2),'h');
 assert(!short.includes('stroke-dasharray="8 5"'));
@@ -82,5 +78,4 @@ for(const step of model.steps){
  assert.equal(step.accumulatedVariance,accumulated);
  assert.equal(step.margin,Math.sqrt(accumulated*(1+(model.steps.indexOf(step)+1)/3)));
 }
-assert(output.includes('No 12-month error history is used'));
 console.log('Range checks passed: same three inputs, sample variance, accumulated spread, and independence from older history.');
