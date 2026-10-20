@@ -52,8 +52,8 @@ The database remains a separate download: `database.synthetic.db` loads automati
 
 ## Hosting and updates
 
-- [Live dashboard](https://denpth.github.io/Aircraft-Maintenance-Material-Management-Dashboard/)
-- [Live SQLite Workbench](https://denpth.github.io/Aircraft-Maintenance-Material-Management-Dashboard/engine.html)
+- [Live dashboard](https://demodashboard.pothier.dev/)
+- [Live SQLite Workbench](https://demoworkbench.pothier.dev/)
 - [Public repository](https://github.com/denpth/Aircraft-Maintenance-Material-Management-Dashboard)
 
 GitHub Pages publishes the root of the `main` branch. Pushing changes to that branch triggers the Pages deployment. Keep the two HTML pages and `database.synthetic.db` together so the automatic database URLs continue to work.

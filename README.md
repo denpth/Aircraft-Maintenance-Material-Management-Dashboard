@@ -2,8 +2,8 @@
 
 Interactive aircraft maintenance dashboard with a self-contained SQLite/WASM engine.
 
-- [Live dashboard](https://denpth.github.io/Aircraft-Maintenance-Material-Management-Dashboard/)
-- [SQLite Workbench](https://denpth.github.io/Aircraft-Maintenance-Material-Management-Dashboard/engine.html)
+- [Live dashboard](https://demodashboard.pothier.dev/)
+- [SQLite Workbench](https://demoworkbench.pothier.dev/)
 - [Synthetic demo database](database.synthetic.db)
 - [Repository file and purpose guide](FILE_GUIDE.md)
 
