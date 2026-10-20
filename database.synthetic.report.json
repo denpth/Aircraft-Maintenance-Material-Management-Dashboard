@@ -21,6 +21,14 @@
   },
   "integrity": "ok",
   "source_database_unchanged": true,
+  "generator_version": 2,
+  "seed": 781423,
+  "scenarios": [
+    "Spring and autumn activity surges; summer and year-end reductions.",
+    "Spring readiness deterioration and late-year recovery.",
+    "Supply pressure and maintenance surges shared across the fleet, with local unit incidents.",
+    "Uneven WUC concentrations, command-specific waves, and aircraft-level noise."
+  ],
   "notes": [
     "Only table/column definitions were read from the source database.",
     "All records, identifiers, descriptions, metadata, dates, and measures were newly generated.",
