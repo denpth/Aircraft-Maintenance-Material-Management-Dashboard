@@ -440,6 +440,26 @@
     <header class="topbar">
       <div class="brand">
         <a id="demoBack" href="https://dpothier.com/projects/aircraft-maintenance-dashboard/" style="display:inline-block;margin-bottom:8px;color:inherit">← Back</a>
+<script>
+(function () {
+    // Public-demo navigation only; keep this out of the operational dashboard.
+    const demoBack = document.getElementById("demoBack");
+    let previousPage = null;
+    try {
+        const referrer = new URL(document.referrer);
+        if (/^https?:$/.test(referrer.protocol) && referrer.hostname !== "demodashboard.pothier.dev") previousPage = referrer;
+    } catch (_) { /* Direct visits use the project-page link. */ }
+    if (previousPage) {
+        demoBack.href = previousPage.href;
+        demoBack.addEventListener("click", event => {
+            if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0 && history.length > 1) {
+                event.preventDefault();
+                history.back();
+            }
+        });
+    }
+}());
+</script>
         <h1>SQLite Workbench</h1>
         <div class="subtitle">Synthetic demo database editor • Changes stay in this browser; Save downloads a copy • <a href="https://demodashboard.pothier.dev/" style="color:inherit">Dashboard</a></div>
       </div>
@@ -1942,25 +1962,6 @@ SELECT * FROM example;`;
     }
 
 </script>
-<script>
-(function () {
-    // Public-demo navigation only; keep this out of the operational dashboard.
-    const demoBack = document.getElementById("demoBack");
-    let previousPage = null;
-    try {
-        const referrer = new URL(document.referrer);
-        if (/^https?:$/.test(referrer.protocol) && referrer.hostname !== "demodashboard.pothier.dev") previousPage = referrer;
-    } catch (_) { /* Direct visits use the project-page link. */ }
-    if (previousPage) {
-        demoBack.href = previousPage.href;
-        demoBack.addEventListener("click", event => {
-            if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && event.button === 0 && history.length > 1) {
-                event.preventDefault();
-                history.back();
-            }
-        });
-    }
-}());
-</script>
+
 </body>
 </html>
